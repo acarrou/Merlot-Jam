@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#2a0f1c">
 <style>
   :root {
+    --imgh: calc(100dvh - 190px);
     --bg: #2a0f1c;
     --ink: #f4e9dc;
     --muted: #c9a9a0;
@@ -45,7 +46,13 @@
     text-transform: uppercase;
   }
 
-  .stage { position: relative; flex: 1; min-height: 0; }
+  .stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    margin: 0 auto;
+  }
   .slides {
     height: 100%;
     display: flex;
@@ -72,7 +79,7 @@
   figure img {
     display: block;
     max-width: 100%;
-    max-height: 100%;
+    max-height: var(--imgh);
     width: auto;
     height: auto;
     border-radius: 6px;
@@ -88,23 +95,28 @@
     transform: translateY(-50%);
     width: 48px;
     height: 48px;
-    border: 1px solid rgba(201, 160, 99, 0.5);
+    padding: 0 0 4px;
+    border: 1px solid rgba(244, 233, 220, 0.55);
     border-radius: 50%;
-    background: rgba(42, 15, 28, 0.6);
+    background: rgba(42, 15, 28, 0.62);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     color: var(--ink);
     font: inherit;
-    font-size: 1.4rem;
+    font-size: 1.9rem;
     line-height: 1;
     cursor: pointer;
-    display: none;
-    transition: opacity 0.2s, background 0.2s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
-  .nav:hover { background: rgba(42, 15, 28, 0.9); }
-  .nav:disabled { opacity: 0; pointer-events: none; }
-  .nav.prev { left: 20px; }
-  .nav.next { right: 20px; }
-  @media (hover: hover) and (min-width: 700px) {
-    .nav { display: block; }
+  .nav:active { background: rgba(42, 15, 28, 0.95); }
+  .nav.prev { left: 6px; }
+  .nav.next { right: 6px; }
+  @media (min-width: 700px) {
+    .stage { max-width: calc(var(--imgh) * 0.951 + 140px); }
+    figure { padding: 4px 70px; }
+    .nav.prev { left: 8px; }
+    .nav.next { right: 8px; }
   }
 
   footer {
@@ -159,7 +171,7 @@
   <div class="stage">
     <div class="slides" id="slides" tabindex="0" aria-label="Photos, swipe to browse">
       <figure>
-        <img src="images/01.jpg" width="1534" height="1800" alt="Embossed copper plaque reading Castlerock Vineyard, Napa County, California">
+        <img src="images/01.jpg?v=3" width="1711" height="1800" alt="Embossed copper plaque reading Castlerock Vineyard, Napa County, California">
       </figure>
       <figure>
         <img src="images/02.jpg" width="1350" height="1800" alt="Two people picking Merlot grapes from the vines in autumn">
@@ -197,15 +209,28 @@
   const label = n => roman[n] || String(n + 1);
   let current = 0;
 
+  const n = figures.length;
+  const AUTO_MS = 4000;      // time each photo stays up
+  const RESUME_MS = 8000;    // pause after someone touches it
+  let timer;
+
   const go = i => {
-    i = Math.max(0, Math.min(figures.length - 1, i));
+    i = ((i % n) + n) % n;   // wrap around at both ends
     slides.scrollTo({ left: i * slides.clientWidth });
   };
+  const schedule = ms => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!document.hidden) go(current + 1);
+      schedule(AUTO_MS);
+    }, ms);
+  };
+  const hold = () => schedule(RESUME_MS);
 
   figures.forEach((_, i) => {
     const b = document.createElement('button');
     b.setAttribute('aria-label', 'Photo ' + (i + 1));
-    b.addEventListener('click', () => go(i));
+    b.addEventListener('click', () => { go(i); hold(); });
     dots.appendChild(b);
   });
 
@@ -213,19 +238,20 @@
     current = Math.round(slides.scrollLeft / slides.clientWidth);
     count.textContent = label(current) + ' / ' + label(figures.length - 1);
     [...dots.children].forEach((d, i) => d.setAttribute('aria-current', i === current));
-    prev.disabled = current === 0;
-    next.disabled = current === figures.length - 1;
   };
 
   slides.addEventListener('scroll', update, { passive: true });
   window.addEventListener('resize', () => slides.scrollTo({ left: current * slides.clientWidth, behavior: 'instant' }));
-  prev.addEventListener('click', () => go(current - 1));
-  next.addEventListener('click', () => go(current + 1));
+  prev.addEventListener('click', () => { go(current - 1); hold(); });
+  next.addEventListener('click', () => { go(current + 1); hold(); });
+  ['touchstart', 'pointerdown', 'wheel'].forEach(t =>
+    slides.addEventListener(t, hold, { passive: true }));
   document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowRight') { e.preventDefault(); go(current + 1); }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); go(current - 1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); go(current + 1); hold(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(current - 1); hold(); }
   });
   update();
+  schedule(AUTO_MS);
 </script>
 </body>
 </html>
